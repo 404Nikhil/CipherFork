@@ -3,7 +3,7 @@
 #include<cstring>
 #include <memory>
 #include <sys/wait.h>
-
+# include "../encryptDecrypt/Encryption.hpp"
 ProcessManagement::ProcessManagement(){}
 
 bool ProcessManagement::submitToQueue(unique_ptr<TaskDataT> task){
@@ -20,6 +20,7 @@ void ProcessManagement::executeTasks(){
         unique_ptr<TaskDataT> task = move(taskQueue.front());
         taskQueue.pop(); // ownership transferred
         cout << "Executing Task: " << task->toString() << endl;
-        executeEncryption(task->toString());
+        string taskString = task->toString();
+        executeEncryption(taskString);
     }
 }
