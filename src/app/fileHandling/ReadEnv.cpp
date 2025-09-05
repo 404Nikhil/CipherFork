@@ -1,19 +1,18 @@
+#include "IO.hpp"
 #include <iostream>
-#include <IO.hpp>
+#include <string>
 #include <fstream>
 #include <sstream>
-#include <bits/stdc++.h>
-using namespace std;
 
-class ReadEnv {
+class ReadEnv{
     public:
-        string getenv(){
-            string env_path = ".env";
+        std::string getenv(){
+            std::string env_path = ".env";
             IO io(env_path);
-            fstream file_stream = io.getFileStream();
-            stringstream buffer;
-            buffer << file_stream.rdbuf();
-            string file_content = buffer.str();
-            return file_content;
-        }
+            std::fstream f_stream = io.getFileStream();
+            std::stringstream buffer;
+            buffer << f_stream.rdbuf();
+            std::string content = buffer.str();
+            return content;
+        }    
 };

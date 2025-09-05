@@ -1,52 +1,48 @@
+// Task.hpp
 #ifndef TASK_HPP
 #define TASK_HPP
-#include <bits/stdc++.h>
-#include <string>
-#include "../fileHandling/IO.hpp"
-#include <iostream>
 
-enum class Action
-{
+#include "../fileHandling/IO.hpp"
+#include <fstream>
+#include <string>
+#include <sstream>
+
+enum class Action {
     ENCRYPT,
     DECRYPT
 };
 
-struct TaskDataT
-{
+struct Task {
+    std::string filePath;
+    std::fstream f_stream;
     Action action;
-    string inputFilePath;
-    fstream inputFileStream;
-    Action actionType;
 
-     TaskDataT(std::fstream&& stream, Action actionType, std::string inputFilePath)
-        : inputFilePath(std::move(inputFilePath)), actionType(actionType) 
-    {}
-        // serialization and deserialization done here
+    Task(std::fstream&& stream, Action act, std::string filePath) : f_stream(std::move(stream)), action(act), filePath(filePath) {}
 
-        string toString(){
-            ostringstream oss;
-            oss << inputFilePath << "," << (actionType == Action::ENCRYPT ? "ENCRYPT" : "DECRYPT");
-            
-            return oss.str();
-        }
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << filePath << "," << (action == Action::ENCRYPT ? "ENCRYPT" : "DECRYPT");
+        return oss.str();
+    }
 
-        static TaskDataT fromString(const string &str){
-            istringstream iss(str);
-            string inputFilePath, actionStr;
-            if(getline(iss, inputFilePath, ',') && getline(iss, actionStr)){
-                Action actionType = (actionStr == "ENCRYPT") ? Action::ENCRYPT : Action::DECRYPT;
-                IO io(inputFilePath);
-                fstream inputFileStream = move(io.getFileStream());
-                if(inputFileStream.is_open()){
-                    return TaskDataT(move(inputFileStream), actionType, inputFilePath);
-                } else {
-                    throw runtime_error("Failed to open file: " + inputFilePath);
-                }
+    static Task fromString(const std::string& taskData) {
+        std::istringstream iss(taskData);
+        std::string filePath;
+        std::string actionStr;
+
+        if (std::getline(iss, filePath, ',') && std::getline(iss, actionStr)) {
+            Action action = (actionStr == "ENCRYPT") ? Action::ENCRYPT : Action::DECRYPT;
+            IO io(filePath);
+            std::fstream f_stream = std::move(io.getFileStream());
+            if (f_stream.is_open()) {
+                return Task(std::move(f_stream), action, filePath);
             } else {
-                throw runtime_error("Invalid string format for TaskDataT");
+                throw std::runtime_error("Failed to open file: " + filePath);
             }
+        } else {
+            throw std::runtime_error("Invalid task data format");
         }
-    
+    }
 };
 
 #endif
