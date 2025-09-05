@@ -1,6 +1,8 @@
-#ifndef ENCRYPTION_HPP
-#define ENCRYPTION_HPP
-using namespace std;
-#include<string>
-int executeEncryption(string &taskData);
+#ifndef CRYPTION_HPP
+#define CRYPTION_HPP
+
+#include <string>
+
+int executeCryption(const std::string& taskData);
+
 #endif

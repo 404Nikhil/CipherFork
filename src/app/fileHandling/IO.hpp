@@ -1,20 +1,18 @@
-// for only 1 time compilation
+// IO.hpp
 #ifndef IO_HPP
 #define IO_HPP
-#include <iostream>
-#include <string>
+
 #include <fstream>
+#include <string>
 
-using namespace std;
 class IO {
-    public:
-        IO(const string &file_path);
-        ~IO();
-        fstream getFileStream();
+public:
+    IO(const std::string& file_path);
+    ~IO();
+    std::fstream getFileStream();
 
-    private:
-        fstream file_stream;
-
+private:
+    std::fstream file_stream;
 };
 
 #endif

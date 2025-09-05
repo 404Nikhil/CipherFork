@@ -1,20 +1,20 @@
+// IO.cpp
 #include <iostream>
-#include <IO.hpp>
-#include <fstream>
-IO::IO(const string &file_path) {
-    file_stream.open(file_path, ios::in | ios::out | ios::binary);
-    if (!file_stream.is_open()) {
-        cerr << "Error opening file: " << file_path << endl;
-        exit(EXIT_FAILURE);
-    }
-}
+#include "IO.hpp"
 
-fstream IO::getFileStream() {
-    return move(file_stream); // return the file stream
+IO::IO(const std::string& file_path) {
+    file_stream.open(file_path, std::ios::in | std::ios::out | std::ios::binary);
+    if (!file_stream.is_open()) {
+        std::cout << "Unable to open file: " << file_path << std::endl;
+    }
 }
 
 IO::~IO() {
     if (file_stream.is_open()) {
         file_stream.close();
     }
+}
+
+std::fstream IO::getFileStream() {
+    return std::move(file_stream);
 }
