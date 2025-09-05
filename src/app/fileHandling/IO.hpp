@@ -4,16 +4,16 @@
 
 #include <fstream>
 #include <string>
-
+using namespace std;
 class IO
 {
 public:
-    IO(const std::string &file_path);
+    IO(const string &file_path);
     ~IO();
-    std::fstream getFileStream();
+    fstream getFileStream();
 
 private:
-    std::fstream file_stream;
+    fstream file_stream;
 };
 
 #endif

@@ -3,20 +3,20 @@
 #include "../fileHandling/ReadEnv.cpp"
 #include <ctime>
 #include <iomanip>
-
-int executeEncryption(const std::string &taskData)
+using namespace std;
+int executeEncryption(const string &taskData)
 {
     Task task = Task::fromString(taskData);
     ReadEnv env;
-    std::string envKey = env.getenv();
-    int key = std::stoi(envKey);
+    string envKey = env.getenv();
+    int key = stoi(envKey);
     if (task.action == Action::ENCRYPT)
     {
         char ch;
         while (task.f_stream.get(ch))
         {
             ch = (ch + key) % 256;
-            task.f_stream.seekp(-1, std::ios::cur);
+            task.f_stream.seekp(-1, ios::cur);
             task.f_stream.put(ch);
         }
         task.f_stream.close();
@@ -27,13 +27,13 @@ int executeEncryption(const std::string &taskData)
         while (task.f_stream.get(ch))
         {
             ch = (ch - key + 256) % 256;
-            task.f_stream.seekp(-1, std::ios::cur);
+            task.f_stream.seekp(-1, ios::cur);
             task.f_stream.put(ch);
         }
         task.f_stream.close();
     }
-    std::time_t t = std::time(nullptr);
-    std::tm *now = std::localtime(&t);
-    std::cout << "Exiting the encryption/decryption at: " << std::put_time(now, "%Y-%m-%d %H:%M:%S") << std::endl;
+    time_t t = time(nullptr);
+    tm *now = localtime(&t);
+    cout << "Exiting the encryption/decryption at: " << put_time(now, "%Y-%m-%d %H:%M:%S") << endl;
     return 0;
 }

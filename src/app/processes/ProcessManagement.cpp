@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <atomic>
 #include <semaphore.h>
-
+using namespace std;
 ProcessManagement::ProcessManagement()
 {
     sem_t *itemsSemaphore = sem_open("/items_semaphore", O_CREAT, 0666, 0); // 0666 permissions, initial value 0
@@ -28,10 +28,10 @@ ProcessManagement::~ProcessManagement()
     shm_unlink(SHM_NAME);
 }
 
-bool ProcessManagement::submitToQueue(std::unique_ptr<Task> task)
+bool ProcessManagement::submitToQueue(unique_ptr<Task> task)
 {
     sem_wait(emptySlotsSemaphore); // queue slots available
-    std::unique_lock<std::mutex> lock(queueLock);
+    unique_lock<mutex> lock(queueLock);
 
     if (sharedMem->size.load() >= 1000)
     {
@@ -59,7 +59,7 @@ bool ProcessManagement::submitToQueue(std::unique_ptr<Task> task)
 void ProcessManagement::executeTask()
 {
     sem_wait(itemsSemaphore);
-    std::unique_lock<std::mutex> lock(queueLock);
+    unique_lock<mutex> lock(queueLock);
     char taskStr[256];
     strcpy(taskStr, sharedMem->tasks[sharedMem->front]);
     sharedMem->front = (sharedMem->front + 1) % 1000;
