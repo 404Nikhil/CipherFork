@@ -1,8 +1,8 @@
-# ThreadCrypt
+# ThreadCrypt: Concurrent File Encryption Utility
 
 ThreadCrypt is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory. It uses a simple substitution cipher based on a secret key provided by the user. This project serves as a practical example of file I/O, process management concepts, and modern C++ application structure.
 
-## Features ✨
+## Features
 
   * **Directory-Based Processing:** Encrypt or decrypt all files within a folder in one go.
   * **Simple Interactive UI:** An easy-to-use prompt guides you through the process.
