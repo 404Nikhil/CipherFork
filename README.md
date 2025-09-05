@@ -1,62 +1,81 @@
-# ThreadCrypt: Concurrent File Encryption Utility
+# ThreadCrypt: A Concurrent File Encryption Utility
 
-ThreadCrypt is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory. It uses a simple substitution cipher based on a secret key provided by the user. This project serves as a practical example of file I/O, process management concepts, and modern C++ application structure.
+ThreadCrypt is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory using a simple substitution cipher. This project serves as a practical example of file I/O, inter-process communication using shared memory, and robust process synchronization in a modern C++ application.
 
 ## Features
 
-  * **Directory-Based Processing:** Encrypt or decrypt all files within a folder in one go.
-  * **Simple Interactive UI:** An easy-to-use prompt guides you through the process.
-  * **Secure Key Management:** The encryption key is safely loaded from a `.env` file, keeping it separate from the source code.
-  * **Modular Design:** The code is organized into logical components for handling I/O, task management, and encryption, making it easy to understand and extend.
-  * **Modern C++ Memory Management:** Uses `std::unique_ptr` and `std::move` for safe, automatic memory management, preventing memory leaks.
+* **Concurrent Processing:** Uses a multiprocessing architecture to handle multiple files at once, significantly speeding up operations in directories with many files.
+* **Simple Interactive UI:** An easy-to-use prompt guides you through selecting a directory and an action.
+* **Secure Key Management:** The encryption key is safely loaded from a `.env` file, keeping it separate from the source code.
+* **Robust Synchronization:** Leverages POSIX semaphores to manage a thread-safe, process-safe producer-consumer queue, preventing race conditions and data corruption.
+* **Efficient IPC:** Uses POSIX shared memory (`mmap`) for high-speed, low-overhead communication between the parent and child processes.
 
 -----
 
-## How It Works: System Architecture 
+## How It Works: System Architecture
 
-The application is broken down into several key components that work together to perform the file operations.
+The application is built around a **producer-consumer model** using multiprocessing. The main process acts as the producer, scanning for files and adding them to a shared task queue. It then forks child processes, which act as consumers, each handling a single encryption or decryption task from the queue.
 
-1.  **`main.cpp` (The Conductor):** This is the entry point of the application. It orchestrates the entire workflow by initializing and calling the other modules. It first uses the `IO` module to get user input, then creates a `Task` for each file, adds them to the `ProcessManagement` queue, and finally initiates the execution.
+1.  **`main.cpp` (The Conductor):** The application's entry point. It takes user input, iterates through the target directory, and for each file, instructs the `ProcessManagement` module to submit a new task.
 
-2.  **`IO` Module (Input/Output Handler):** This component is responsible for all interaction with the user and the file system.
+2.  **`ProcessManagement` Module (The Task Manager):** This is the heart of the concurrent architecture. It is responsible for:
+    * Setting up a shared memory region using `mmap` that contains the task queue.
+    * Initializing the semaphores used for synchronization.
+    * Forking new child processes to act as workers.
+    * Implementing the logic for safely adding tasks (producing) and executing tasks (consuming).
 
-      * `getDirectoryPathAndAction()`: Prompts the user to enter the target directory and the desired action (`encrypt`/`decrypt`).
-      * `readDirectory()`: Scans the specified directory and returns a list of all filenames within it.
-
-3.  **`Task` Module (The Work Order):** A simple class that represents a single unit of work. Each `Task` object contains two pieces of information:
-
-      * The **action** to be performed (`ENCRYPT` or `DECRYPT`).
-      * The **file path** of the target file.
-
-4.  **`ProcessManagement` Module (The Task Manager):** This module manages the workflow. It maintains a queue of `Task` objects. Its `executeTasks()` method iterates through the queue, processing each task sequentially. For every task, it calls the core `executeEncryption` function to perform the actual file modification.
-
-5.  **`Encryption` Module (The Worker):** This is the core logic engine. The `executeEncryption` function takes a task, reads the specified file character by character, applies a simple Caesar cipher (shifting the character's value by the secret key), and overwrites the file with the new content.
-
-6.  **`ReadEnv` Module (Configuration):** A small utility that handles reading the `ENCRYPTION_KEY` from the `.env` file, ensuring that sensitive data is not hardcoded.
+3.  **`Encryption` Module (The Worker):** This module contains the core encryption/decryption logic. It's executed by each child process on a single task taken from the shared queue.
 
 -----
 
-## Memory Management: The Role of `unique_ptr` and `std::move`
+## Deep Dive: Multiprocessing and Synchronization
 
-This project uses modern C++ smart pointers to ensure safe and automatic memory management, completely avoiding manual `new` and `delete` calls.
+To allow the parent process (producer) and multiple child processes (consumers) to safely share the task queue, it uses a combination of shared memory and POSIX semaphores. This solves the classic computer science challenge of the **bounded-buffer producer-consumer problem**.
 
-  * **`std::unique_ptr`**: This is a smart pointer that provides exclusive ownership of a dynamically allocated object. When a `unique_ptr` goes out of scope, it automatically deletes the object it points to, which effectively prevents memory leaks.
+### The Challenge: Race Conditions
 
-  * **`std::move`**: Because a `unique_ptr` guarantees exclusive ownership, it cannot be copied. To transfer the ownership of the object from one `unique_ptr` to another, we use `std::move`. This makes the transfer of ownership an explicit and safe operation.
+When multiple processes access a shared resource (like our task queue) simultaneously, we risk a **race condition**. For example:
+* The parent process might try to add a task to the queue at the exact same moment a child process is trying to remove one.
+* Two child processes might try to take the same task at the same time.
+* The parent might try to add a task to a full queue, overwriting an existing task that hasn't been processed yet.
 
-This pattern is used to manage the lifecycle of `Task` objects:
+These scenarios would lead to a corrupted queue, lost tasks, and unpredictable behavior. To prevent this, we must enforce mutual exclusion and manage the queue's state carefully.
 
-1.  **Creation in `main.cpp`**: For each file, a `Task` is created on the heap using `std::make_unique<Task>()`. A `unique_ptr` in `main` now owns this `Task`.
+### Semaphores as Locks and Signals
 
-2.  **Ownership Transfer**: The `main` function calls `processManager.submitToQueue(std::move(task))`. The `std::move` transfers ownership of the `Task` object from the `main` function to the `ProcessManagement` module's `taskQueue`.
+As seen in `ProcessManagement.cpp`, the application uses three semaphores to orchestrate access to the shared queue. A semaphore is a special integer variable that the operating system manages, which can be incremented (`sem_post`) or decremented (`sem_wait`) atomically.
 
-3.  **Execution in `ProcessManagement.cpp`**: Inside the `executeTasks` loop, ownership is moved again from the queue to a local `unique_ptr` named `taskToExecute`.
+1.  **The Mutex Lock (`mutexSemaphore`)**
+    * **Purpose:** To ensure **mutual exclusion**. This semaphore acts as a simple lock. It guarantees that only one process can be inside a "critical section" (the code that modifies the queue's pointers `front`, `rear`, and `size`) at any given time.
+    * **How it works:** It's initialized with a value of 1. Before accessing the queue, a process calls `sem_wait(mutexSemaphore)`, which decrements the value to 0. Since the value is now 0, any other process that calls `sem_wait` will be forced to sleep (block) until the first process is finished. Once the first process is done, it calls `sem_post(mutexSemaphore)`, which increments the value back to 1, waking up one of the waiting processes. This is the "lock" and "unlock" mechanism.
 
-4.  **Automatic Cleanup**: At the end of each loop iteration, `taskToExecute` goes out of scope. Its destructor is called, which automatically frees the memory of the `Task` object it owns.
+2.  **The Item Counter (`itemsSemaphore`)**
+    * **Purpose:** To track the number of tasks currently in the queue. This prevents consumers from trying to read from an empty queue.
+    * **How it works:** It's initialized to 0. When a consumer (child process) wants to take a task, it first calls `sem_wait(itemsSemaphore)`. If the queue is empty (value is 0), the process will block until the producer adds a task and calls `sem_post(itemsSemaphore)`, incrementing the count.
 
-This entire process ensures that every `Task` object is correctly deallocated without any manual memory management, leading to safer and more robust code.
+3.  **The Empty Slot Counter (`emptySlotsSemaphore`)**
+    * **Purpose:** To track the number of available slots in the queue. This prevents the producer from adding tasks to a full queue.
+    * **How it works:** It's initialized to `QUEUE_CAPACITY`. When the producer (parent process) wants to add a task, it first calls `sem_wait(emptySlotsSemaphore)`. If the queue is full (value is 0), the producer will block until a consumer removes a task and calls `sem_post(emptySlotsSemaphore)`, freeing up a slot.
 
------
+### The Logic Flow
+
+Here is the sequence of operations for each process, which ensures a perfectly synchronized and safe workflow:
+
+**Parent Process (Producer Logic in `submitToQueue`)**:
+1.  `sem_wait(emptySlotsSemaphore)`: Wait until there is an empty slot in the queue. If full, sleep.
+2.  `sem_wait(mutexSemaphore)`: Acquire the lock to get exclusive access to the queue.
+3.  **Critical Section:** Add the new task to the `tasks` array and update the `rear` pointer.
+4.  `sem_post(mutexSemaphore)`: Release the lock.
+5.  `sem_post(itemsSemaphore)`: Signal to any waiting consumers that a new item is available.
+6.  `fork()`: Create a new child process to eventually consume a task.
+
+**Child Process (Consumer Logic in `executeTask`)**:
+1.  `sem_wait(itemsSemaphore)`: Wait until there is at least one item in the queue. If empty, sleep.
+2.  `sem_wait(mutexSemaphore)`: Acquire the lock to get exclusive access to the queue.
+3.  **Critical Section:** Read a task from the `tasks` array and update the `front` pointer.
+4.  `sem_post(mutexSemaphore)`: Release the lock.
+5.  `sem_post(emptySlotsSemaphore)`: Signal to the producer that a slot has been freed up.
+6.  Execute the encryption/decryption on the retrieved task.
 
 ## Project Setup and Installation
 
