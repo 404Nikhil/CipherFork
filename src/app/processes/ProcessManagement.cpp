@@ -38,8 +38,8 @@ bool ProcessManagement::submitToQueue(std::unique_ptr<Task> task) {
     lock.unlock();
     sem_post(itemsSemaphore);
 
-    int pid = fork();
-    if (pid < 0) {
+    int pid = fork(); // child process spinup, parent processid
+    if (pid < 0) { 
         return false;
     } else if (pid == 0) {
         executeTask();
