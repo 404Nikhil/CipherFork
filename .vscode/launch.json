@@ -11,10 +11,10 @@
             "preLaunchTask": "build",
         },
         {
-            "name": "Debug cryption (standalone)",
+            "name": "Debug encryption (standalone)",
             "type": "gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/cryption",
+            "program": "${workspaceFolder}/encryption",
             "args": ["your_task_data_here"],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "build",

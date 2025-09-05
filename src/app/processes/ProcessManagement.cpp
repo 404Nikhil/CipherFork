@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <sys/wait.h>
-#include "../encryptDecrypt/Cryption.hpp"
+#include "../encryptDecrypt/Encryption.hpp"
 
 ProcessManagement::ProcessManagement() {}
 
@@ -18,18 +18,18 @@ void ProcessManagement::executeTasks() {
         taskQueue.pop();
         std::cout << "Executing task: " << taskToExecute->toString() << std::endl;
         // Add a breakpoint here in VS Code
-        executeCryption(taskToExecute->toString());
+        executeEncryption(taskToExecute->toString());
         // int childProcessToRun = fork();
         // if (childProcessToRun == 0) {
         //     // Child process
         //     std::string taskStr = taskToExecute->toString();
         //     char* args[3];
-        //     args[0] = strdup("./cryption");  // Use the correct path to your cryption executable
+        //     args[0] = strdup("./encryption");  // Use the correct path to your encryption executable
         //     args[1] = strdup(taskStr.c_str());
         //     args[2] = nullptr;
-        //     execv("./cryption", args);  // Use the correct path to your cryption executable
+        //     execv("./encryption", args);  // Use the correct path to your encryption executable
         //     // If execv returns, there was an error
-        //     std::cerr << "Error executing cryption" << std::endl;
+        //     std::cerr << "Error executing encryption" << std::endl;
         //     exit(1);
         // } else if (childProcessToRun > 0) {
         //     // Parent process
