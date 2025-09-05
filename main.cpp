@@ -1,41 +1,47 @@
-#include<bits/stdc++.h>
+#include <iostream>
 #include <filesystem>
 #include "./src/app/processes/ProcessManagement.hpp"
-#include "./src/app/processes/TaskDataT.hpp"
-#include "./src/app/encryptDecrypt/Encryption.hpp"
-namespace fs = std::filesystem;
-using namespace std;
+#include "./src/app/processes/Task.hpp"
 
-int main(int argc, char *argv[]){
-    string directory;
-    string action;
-    cout << "Enter directory path: "<<endl;
-    getline(cin, directory);
-    cout << "Enter action (ENCRYPT/DECRYPT): "<<endl;
-    getline(cin, action);
+namespace fs = std::filesystem;
+
+int main(int argc, char* argv[]) {
+    std::string directory;
+    std::string action;
+
+    std::cout << "Enter the directory path: ";
+    std::getline(std::cin, directory);
+
+    std::cout << "Enter the action (encrypt/decrypt): ";
+    std::getline(std::cin, action);
 
     try {
-        if(fs::exists(directory) && fs::is_directory(directory)){
-            ProcessManagement pm;
-            for(const auto & entry : fs::directory_iterator(directory)){
-                if(entry.is_regular_file()){
-                    string file_path = entry.path().string();
-                    IO io(file_path);
-                    fstream file_stream = move(io.getFileStream());
-                    if(file_stream.is_open()){
-                        Action actionType = (action == "ENCRYPT") ? Action::ENCRYPT : Action::DECRYPT;
-                        auto  task = make_unique<TaskDataT>(move(file_stream),actionType, file_path); 
-                        pm.submitToQueue(move(task));
+        if (fs::exists(directory) && fs::is_directory(directory)) {
+            ProcessManagement processManagement;
+
+            for (const auto& entry : fs::recursive_directory_iterator(directory)) {
+                if (entry.is_regular_file()) {
+                    std::string filePath = entry.path().string();
+                    IO io(filePath);
+                    std::fstream f_stream = std::move(io.getFileStream());
+
+                    if (f_stream.is_open()) {
+                        Action taskAction = (action == "encrypt") ? Action::ENCRYPT : Action::DECRYPT;
+                        auto task = std::make_unique<Task>(std::move(f_stream), taskAction, filePath);
+                        processManagement.submitToQueue(std::move(task));
                     } else {
-                        cerr << "Error: Could not open file " << file_path << endl;
+                        std::cout << "Unable to open file: " << filePath << std::endl;
                     }
                 }
             }
-            pm.executeTasks();
-    }else {
-        cout << "Directory does not exist or is not a directory." << endl;
+
+            processManagement.executeTasks();
+        } else {
+            std::cout << "Invalid directory path!" << std::endl;
+        }
+    } catch (const fs::filesystem_error& ex) {
+        std::cout << "Filesystem error: " << ex.what() << std::endl;
     }
-       } catch(const fs::filesystem_error& e){
-        cerr << "Filesystem error: " << e.what() << endl;
-    }
+
+    return 0;
 }
