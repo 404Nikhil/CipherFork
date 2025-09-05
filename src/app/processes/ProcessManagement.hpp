@@ -23,7 +23,7 @@ private:
     // mmap files
     // shared file descriptor
     struct SharedMemory {  // 
-        std::atomic<int> size;
+        std::atomic<int> size; // one at a time
         char tasks[1000][256];
         int front;
         int rear;
@@ -37,7 +37,7 @@ private:
     };
     SharedMemory* sharedMem;
     int shmFd;
-    const char* SHM_NAME = "/my_queue";
+    const char* SHM_NAME = "/my_queue"; // name of the shared memory object file
     std::mutex queueLock;
 };
 
