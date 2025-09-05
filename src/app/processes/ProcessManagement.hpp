@@ -9,8 +9,8 @@
 
 class ProcessManagement
 {
-    sem_t* itemsSemaphore;
-    sem_t* emptySlotsSemaphore;
+    sem_t *itemsSemaphore;
+    sem_t *emptySlotsSemaphore;
 
 public:
     ProcessManagement();
@@ -19,25 +19,26 @@ public:
     void executeTask();
 
 private:
-    // shared memory data structure to share queue between processes 
+    // shared memory data structure to share queue between processes
     // mmap files
     // shared file descriptor
-    struct SharedMemory {  // 
+    struct SharedMemory
+    {                          //
         std::atomic<int> size; // one at a time
         char tasks[1000][256];
         int front;
         int rear;
 
-        void printSharedMemory() {
-            std::cout<<size<<std::endl;
-            std::cout<<front<<std::endl;
-            std::cout<<rear<<std::endl;
+        void printSharedMemory()
+        {
+            std::cout << size << std::endl;
+            std::cout << front << std::endl;
+            std::cout << rear << std::endl;
         }
-
     };
-    SharedMemory* sharedMem;
+    SharedMemory *sharedMem;
     int shmFd;
-    const char* SHM_NAME = "/my_queue"; // name of the shared memory object file
+    const char *SHM_NAME = "/my_queue"; // name of the shared memory object file
     std::mutex queueLock;
 };
 

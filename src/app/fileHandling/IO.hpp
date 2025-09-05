@@ -5,9 +5,10 @@
 #include <fstream>
 #include <string>
 
-class IO {
+class IO
+{
 public:
-    IO(const std::string& file_path);
+    IO(const std::string &file_path);
     ~IO();
     std::fstream getFileStream();
 

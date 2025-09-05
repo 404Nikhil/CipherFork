@@ -3,6 +3,6 @@
 
 #include <string>
 
-int executeEncryption(const std::string& taskData);
+int executeEncryption(const std::string &taskData);
 
 #endif

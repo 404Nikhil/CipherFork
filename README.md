@@ -1,6 +1,6 @@
-# ThreadCrypt: A Concurrent File Encryption Utility
+# CipherFork: A Concurrent File Encryption Utility
 
-ThreadCrypt is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory using a simple substitution cipher. This project serves as a practical example of file I/O, inter-process communication using shared memory, and robust process synchronization in a modern C++ application.
+CipherFork is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory using a simple substitution cipher. This project serves as a practical example of file I/O, inter-process communication using shared memory, and robust process synchronization in a modern C++ application.
 
 ## Features
 
