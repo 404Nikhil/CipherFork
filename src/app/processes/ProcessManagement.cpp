@@ -4,7 +4,6 @@
 #include <memory>
 #include <sys/wait.h>
 # include "../encryptDecrypt/Encryption.hpp"
-ProcessManagement::ProcessManagement(){}
 
 bool ProcessManagement::submitToQueue(unique_ptr<TaskDataT> task){
     if(task == nullptr){

@@ -24,7 +24,7 @@ int main(int argc, char *argv[]){
                     fstream file_stream = move(io.getFileStream());
                     if(file_stream.is_open()){
                         Action actionType = (action == "ENCRYPT") ? Action::ENCRYPT : Action::DECRYPT;
-                        auto  task = make_unique<TaskDataT>(actionType, file_path, move(file_stream)); 
+                        auto  task = make_unique<TaskDataT>(move(file_stream),actionType, file_path); 
                         pm.submitToQueue(move(task));
                     } else {
                         cerr << "Error: Could not open file " << file_path << endl;

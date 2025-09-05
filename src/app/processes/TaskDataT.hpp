@@ -18,8 +18,8 @@ struct TaskDataT
     fstream inputFileStream;
     Action actionType;
 
-    TaskDataT(fstream &&stream, Action actionType, string inputFilePath)
-        : inputFileStream(move(stream)), actionType(actionType), inputFilePath(inputFilePath)
+     TaskDataT(std::fstream&& stream, Action actionType, std::string inputFilePath)
+        : inputFilePath(std::move(inputFilePath)), actionType(actionType) 
     {}
         // serialization and deserialization done here
 
