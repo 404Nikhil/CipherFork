@@ -1,4 +1,3 @@
-// Task.hpp
 #ifndef TASK_HPP
 #define TASK_HPP
 
@@ -6,53 +5,41 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <stdexcept>
+
 using namespace std;
-enum class Action
-{
+
+enum class Action {
     ENCRYPT,
     DECRYPT
 };
 
-struct Task
-{
+struct Task {
     string filePath;
-    fstream f_stream;
+    // tasks only carry information, not open resources like file streams.
     Action action;
 
-    Task(fstream &&stream, Action act, string filePath) : f_stream(move(stream)), action(act), filePath(filePath) {}
+    Task(Action act, string path) 
+        : action(act), filePath(move(path)) {}
 
-    string toString() const
-    {
+    string toString() const {
         ostringstream oss;
         oss << filePath << "," << (action == Action::ENCRYPT ? "ENCRYPT" : "DECRYPT");
         return oss.str();
     }
 
-    static Task fromString(const string &taskData)
-    {
+    // fromString no longer opens a file, it just creates a Task object.
+    static Task fromString(const string& taskData) {
         istringstream iss(taskData);
         string filePath;
         string actionStr;
 
-        if (getline(iss, filePath, ',') && getline(iss, actionStr))
-        {
+        if (getline(iss, filePath, ',') && getline(iss, actionStr)) {
             Action action = (actionStr == "ENCRYPT") ? Action::ENCRYPT : Action::DECRYPT;
-            IO io(filePath);
-            fstream f_stream = move(io.getFileStream());
-            if (f_stream.is_open())
-            {
-                return Task(move(f_stream), action, filePath);
-            }
-            else
-            {
-                throw runtime_error("Failed to open file: " + filePath);
-            }
-        }
-        else
-        {
-            throw runtime_error("Invalid task data format");
+            return Task(action, filePath);
+        } else {
+            throw runtime_error("Invalid task data format in fromString");
         }
     }
 };
-
 #endif

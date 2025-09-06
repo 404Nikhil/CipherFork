@@ -3,43 +3,42 @@
 
 #include "Task.hpp"
 #include <memory>
-#include <mutex>
 #include <atomic>
 #include <semaphore.h>
-using namespace std;
-class ProcessManagement
-{
-    sem_t *itemsSemaphore;
-    sem_t *emptySlotsSemaphore;
+#include <iostream>
+#include <unistd.h> // pid_t
 
+using namespace std;
+
+class ProcessManagement {
 public:
     ProcessManagement();
     ~ProcessManagement();
-    bool submitToQueue(unique_ptr<Task> task);
+    pid_t submitToQueue(unique_ptr<Task> task);
     void executeTask();
 
 private:
-    // shared memory data structure to share queue between processes
-    // mmap files
-    // shared file descriptor
-    struct SharedMemory
-    {                     //
-        atomic<int> size; // one at a time
+    struct SharedMemory {
+        atomic<int> size;
         char tasks[1000][256];
         int front;
         int rear;
-
-        void printSharedMemory()
-        {
-            cout << size << endl;
-            cout << front << endl;
-            cout << rear << endl;
-        }
     };
-    SharedMemory *sharedMem;
+
+    SharedMemory* sharedMem;
     int shmFd;
-    const char *SHM_NAME = "/my_queue"; // name of the shared memory object file
-    mutex queueLock;
+    
+    // names for shared memory and semaphores
+    const char* SHM_NAME = "/forkcrypt_shm";
+    const char* MUTEX_SEM_NAME = "/forkcrypt_mutex";
+    const char* ITEMS_SEM_NAME = "/forkcrypt_items";
+    const char* SLOTS_SEM_NAME = "/forkcrypt_slots";
+
+    // semaphores for synchronization between processes
+    sem_t* mutexSemaphore;
+    sem_t* itemsSemaphore;
+    sem_t* emptySlotsSemaphore;
 };
 
 #endif
+

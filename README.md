@@ -1,81 +1,80 @@
-# CipherFork: A Concurrent File Encryption Utility
+## CipherFork: A Concurrent File Encryption Utility
 
 CipherFork is a command-line tool written in C++ that encrypts or decrypts all files within a specified directory using a simple substitution cipher. This project serves as a practical example of file I/O, inter-process communication using shared memory, and robust process synchronization in a modern C++ application.
 
 ## Features
 
-* **Concurrent Processing:** Uses a multiprocessing architecture to handle multiple files at once, significantly speeding up operations in directories with many files.
+* **Concurrent Processing:** Uses a multiprocessing architecture (`fork()`) to handle multiple files at once, significantly speeding up operations in directories with many files.
 * **Simple Interactive UI:** An easy-to-use prompt guides you through selecting a directory and an action.
 * **Secure Key Management:** The encryption key is safely loaded from a `.env` file, keeping it separate from the source code.
-* **Robust Synchronization:** Leverages POSIX semaphores to manage a thread-safe, process-safe producer-consumer queue, preventing race conditions and data corruption.
-* **Efficient IPC:** Uses POSIX shared memory (`mmap`) for high-speed, low-overhead communication between the parent and child processes.
+* **Robust Synchronization:** Leverages POSIX semaphores to manage a process-safe producer-consumer queue, preventing race conditions.
+* **Memory Safe IPC:** Uses POSIX shared memory (`mmap`) for high-speed communication and employs safe string functions (`strncpy`) to prevent buffer overflows.
+* **Resilient by Design:** Includes comprehensive error checking for all system calls, ensuring the application fails gracefully instead of crashing on resource allocation errors.
 
------
-
-## How It Works: System Architecture
+## System Architecture
 
 The application is built around a **producer-consumer model** using multiprocessing. The main process acts as the producer, scanning for files and adding them to a shared task queue. It then forks child processes, which act as consumers, each handling a single encryption or decryption task from the queue.
 
-1.  **`main.cpp` (The Conductor):** The application's entry point. It takes user input, iterates through the target directory, and for each file, instructs the `ProcessManagement` module to submit a new task.
-
+1.  **`main.cpp` (The Conductor):** The application's entry point. It takes user input, iterates through the target directory, and for each file, instructs the `ProcessManagement` module to submit a new task. It is also responsible for waiting for all child processes to complete before exiting.
 2.  **`ProcessManagement` Module (The Task Manager):** This is the heart of the concurrent architecture. It is responsible for:
-    * Setting up a shared memory region using `mmap` that contains the task queue.
-    * Initializing the semaphores used for synchronization.
+    * Safely setting up and tearing down a shared memory region and POSIX semaphores.
     * Forking new child processes to act as workers.
     * Implementing the logic for safely adding tasks (producing) and executing tasks (consuming).
+3.  **`Encryption` Module (The Worker):** This module contains the core encryption/decryption logic. It's executed by each child process, which is responsible for opening the file, processing its content, and closing it.
 
-3.  **`Encryption` Module (The Worker):** This module contains the core encryption/decryption logic. It's executed by each child process on a single task taken from the shared queue.
+## Multiprocessing and Synchronization
 
------
+To allow the parent process (producer) and multiple child processes (consumers) to safely share the task queue, CipherFork uses a combination of shared memory and POSIX semaphores. This solves the classic computer science challenge of the **bounded-buffer producer-consumer problem**.
 
-## Deep Dive: Multiprocessing and Synchronization
+### Race Conditions and Memory Corruption
 
-To allow the parent process (producer) and multiple child processes (consumers) to safely share the task queue, it uses a combination of shared memory and POSIX semaphores. This solves the classic computer science challenge of the **bounded-buffer producer-consumer problem**.
+When multiple processes access a shared resource simultaneously, we risk critical bugs:
 
-### The Challenge: Race Conditions
+* **Race Conditions:** Two processes trying to modify the queue's state at the same time can lead to a corrupted queue, lost tasks, and unpredictable behavior.
+* **Memory Corruption:** If a long file path is written into the shared memory without checking its length, it can write past its allocated buffer, corrupting adjacent data and causing random segmentation faults.
 
-When multiple processes access a shared resource (like our task queue) simultaneously, we risk a **race condition**. For example:
-* The parent process might try to add a task to the queue at the exact same moment a child process is trying to remove one.
-* Two child processes might try to take the same task at the same time.
-* The parent might try to add a task to a full queue, overwriting an existing task that hasn't been processed yet.
+### Semaphores and Safe Memory Practices
 
-These scenarios would lead to a corrupted queue, lost tasks, and unpredictable behavior. To prevent this, we must enforce mutual exclusion and manage the queue's state carefully.
+**1. Semaphores as Locks and Signals:**
+As seen in `ProcessManagement.cpp`, the application uses three named semaphores to orchestrate access to the shared queue. These are managed by the operating system and work reliably across different processes.
 
-### Semaphores as Locks and Signals
+* **`mutexSemaphore`**: A binary semaphore (acting as a lock) that ensures only one process can be in a "critical section" (modifying the queue's `front` and `rear` pointers) at any given time.
+* **`itemsSemaphore`**: A counting semaphore that tracks the number of tasks in the queue. Consumers wait on this, preventing them from trying to read from an empty queue.
+* **`emptySlotsSemaphore`**: A counting semaphore that tracks available space. The producer waits on this, preventing it from adding tasks to a full queue.
 
-As seen in `ProcessManagement.cpp`, the application uses three semaphores to orchestrate access to the shared queue. A semaphore is a special integer variable that the operating system manages, which can be incremented (`sem_post`) or decremented (`sem_wait`) atomically.
+**2. Robustness and Error Handling:**
+A key feature of CipherFork's stability is its rigorous checking of system resources.
 
-1.  **The Mutex Lock (`mutexSemaphore`)**
-    * **Purpose:** To ensure **mutual exclusion**. This semaphore acts as a simple lock. It guarantees that only one process can be inside a "critical section" (the code that modifies the queue's pointers `front`, `rear`, and `size`) at any given time.
-    * **How it works:** It's initialized with a value of 1. Before accessing the queue, a process calls `sem_wait(mutexSemaphore)`, which decrements the value to 0. Since the value is now 0, any other process that calls `sem_wait` will be forced to sleep (block) until the first process is finished. Once the first process is done, it calls `sem_post(mutexSemaphore)`, which increments the value back to 1, waking up one of the waiting processes. This is the "lock" and "unlock" mechanism.
-
-2.  **The Item Counter (`itemsSemaphore`)**
-    * **Purpose:** To track the number of tasks currently in the queue. This prevents consumers from trying to read from an empty queue.
-    * **How it works:** It's initialized to 0. When a consumer (child process) wants to take a task, it first calls `sem_wait(itemsSemaphore)`. If the queue is empty (value is 0), the process will block until the producer adds a task and calls `sem_post(itemsSemaphore)`, incrementing the count.
-
-3.  **The Empty Slot Counter (`emptySlotsSemaphore`)**
-    * **Purpose:** To track the number of available slots in the queue. This prevents the producer from adding tasks to a full queue.
-    * **How it works:** It's initialized to `QUEUE_CAPACITY`. When the producer (parent process) wants to add a task, it first calls `sem_wait(emptySlotsSemaphore)`. If the queue is full (value is 0), the producer will block until a consumer removes a task and calls `sem_post(emptySlotsSemaphore)`, freeing up a slot.
+* **Initialization Checks:** The return values of `sem_open`, `shm_open`, and `mmap` are all checked. If any of these critical resources fail to be allocated by the OS, the program throws an exception and terminates immediately with a clear error message, preventing a crash later on.
+* **Memory Safety:** The unsafe `strcpy` function is avoided. Instead, `strncpy` is used to copy file paths into the shared memory, guaranteeing that a long path can never cause a buffer overflow.
 
 ### The Logic Flow
 
 Here is the sequence of operations for each process, which ensures a perfectly synchronized and safe workflow:
 
-**Parent Process (Producer Logic in `submitToQueue`)**:
-1.  `sem_wait(emptySlotsSemaphore)`: Wait until there is an empty slot in the queue. If full, sleep.
-2.  `sem_wait(mutexSemaphore)`: Acquire the lock to get exclusive access to the queue.
-3.  **Critical Section:** Add the new task to the `tasks` array and update the `rear` pointer.
-4.  `sem_post(mutexSemaphore)`: Release the lock.
-5.  `sem_post(itemsSemaphore)`: Signal to any waiting consumers that a new item is available.
-6.  `fork()`: Create a new child process to eventually consume a task.
+**Parent Process (Producer Logic in `main.cpp` and `submitToQueue`)**:
+
+1.  Scans the directory for a file.
+2.  Calls `submitToQueue` which waits for an empty slot (`sem_wait(emptySlotsSemaphore)`).
+3.  Acquires the mutex lock (`sem_wait(mutexSemaphore)`).
+4.  **Critical Section:** Safely copies the task string into the shared `tasks` array and updates the `rear` pointer.
+5.  Releases the mutex lock (`sem_post(mutexSemaphore)`).
+6.  Signals that a new item is available (`sem_post(itemsSemaphore)`).
+7.  Calls `fork()` to create a new child process.
+8.  The parent process **saves the child's PID** and continues its loop. It **does not** execute the task.
+9.  After the directory scan is complete, the parent waits for all saved child PIDs to exit.
 
 **Child Process (Consumer Logic in `executeTask`)**:
-1.  `sem_wait(itemsSemaphore)`: Wait until there is at least one item in the queue. If empty, sleep.
-2.  `sem_wait(mutexSemaphore)`: Acquire the lock to get exclusive access to the queue.
-3.  **Critical Section:** Read a task from the `tasks` array and update the `front` pointer.
-4.  `sem_post(mutexSemaphore)`: Release the lock.
-5.  `sem_post(emptySlotsSemaphore)`: Signal to the producer that a slot has been freed up.
-6.  Execute the encryption/decryption on the retrieved task.
+
+1.  The child process begins execution immediately after the `fork()`.
+2.  It calls `executeTask()`, which waits for an available item (`sem_wait(itemsSemaphore)`).
+3.  Acquires the mutex lock (`sem_wait(mutexSemaphore)`).
+4.  **Critical Section:** Reads a task from the shared `tasks` array and updates the `front` pointer.
+5.  Releases the mutex lock (`sem_post(mutexSemaphore)`).
+6.  Signals that a slot has been freed up (`sem_post(emptySlotsSemaphore)`).
+7.  Executes the encryption/decryption on the retrieved task.
+8.  Calls `exit(0)` to terminate itself.
+
 
 ## Project Setup and Installation
 

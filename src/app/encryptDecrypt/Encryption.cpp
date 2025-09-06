@@ -1,20 +1,34 @@
 #include "Encryption.hpp"
 #include "../processes/Task.hpp"
-#include "../fileHandling/ReadEnv.cpp"
+#include "../fileHandling/IO.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
+#include <sstream>
 
 using namespace std;
+namespace {
+    class ReadEnv {
+    public:
+        string getenv() {
+            string env_path = ".env";
+            IO io(env_path);
+            fstream f_stream = io.getFileStream();
+            stringstream buffer;
+            if (f_stream.is_open()) {
+                buffer << f_stream.rdbuf();
+            }
+            return buffer.str();
+        }
+    };
+}
 
 void executeEncryption(const char* taskStr) {
     try {
-        // deserialize the task string
         string taskData(taskStr);
         Task task = Task::fromString(taskData);
 
-        // the encryption key.
         ReadEnv envReader;
         string key_str = envReader.getenv();
         if (key_str.empty()) {
@@ -23,6 +37,8 @@ void executeEncryption(const char* taskStr) {
         }
         char key = key_str[0];
 
+        // child process opens the file here.
+        // the single point of responsibility for file I/O.
         fstream file_stream(task.filePath, ios::in | ios::out | ios::binary);
         if (!file_stream.is_open()) {
             cerr << "Child process could not open file: " << task.filePath << endl;
@@ -32,6 +48,11 @@ void executeEncryption(const char* taskStr) {
         file_stream.seekg(0, ios::end);
         streampos fileSize = file_stream.tellg();
         file_stream.seekg(0, ios::beg);
+
+        if (fileSize == 0) { // empty files
+            file_stream.close();
+            return;
+        }
 
         vector<char> buffer(fileSize);
         file_stream.read(buffer.data(), fileSize);
