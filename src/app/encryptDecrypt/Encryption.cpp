@@ -1,39 +1,54 @@
 #include "Encryption.hpp"
 #include "../processes/Task.hpp"
 #include "../fileHandling/ReadEnv.cpp"
-#include <ctime>
-#include <iomanip>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+
 using namespace std;
-int executeEncryption(const string &taskData)
-{
-    Task task = Task::fromString(taskData);
-    ReadEnv env;
-    string envKey = env.getenv();
-    int key = stoi(envKey);
-    if (task.action == Action::ENCRYPT)
-    {
-        char ch;
-        while (task.f_stream.get(ch))
-        {
-            ch = (ch + key) % 256;
-            task.f_stream.seekp(-1, ios::cur);
-            task.f_stream.put(ch);
+
+void executeEncryption(const char* taskStr) {
+    try {
+        // deserialize the task string
+        string taskData(taskStr);
+        Task task = Task::fromString(taskData);
+
+        // the encryption key.
+        ReadEnv envReader;
+        string key_str = envReader.getenv();
+        if (key_str.empty()) {
+            cerr << "ERROR: Encryption key not found in .env file for task: " << task.filePath << endl;
+            return;
         }
-        task.f_stream.close();
-    }
-    else
-    {
-        char ch;
-        while (task.f_stream.get(ch))
-        {
-            ch = (ch - key + 256) % 256;
-            task.f_stream.seekp(-1, ios::cur);
-            task.f_stream.put(ch);
+        char key = key_str[0];
+
+        fstream file_stream(task.filePath, ios::in | ios::out | ios::binary);
+        if (!file_stream.is_open()) {
+            cerr << "Child process could not open file: " << task.filePath << endl;
+            return;
         }
-        task.f_stream.close();
+
+        file_stream.seekg(0, ios::end);
+        streampos fileSize = file_stream.tellg();
+        file_stream.seekg(0, ios::beg);
+
+        vector<char> buffer(fileSize);
+        file_stream.read(buffer.data(), fileSize);
+
+        for (size_t i = 0; i < buffer.size(); ++i) {
+            if (task.action == Action::ENCRYPT) {
+                buffer[i] = buffer[i] + key;
+            } else {
+                buffer[i] = buffer[i] - key;
+            }
+        }
+
+        file_stream.seekp(0, ios::beg);
+        file_stream.write(buffer.data(), fileSize);
+        file_stream.close();
+
+    } catch (const exception& e) {
+        cerr << "An exception occurred in child process: " << e.what() << endl;
     }
-    time_t t = time(nullptr);
-    tm *now = localtime(&t);
-    cout << "Exiting the encryption/decryption at: " << put_time(now, "%Y-%m-%d %H:%M:%S") << endl;
-    return 0;
 }

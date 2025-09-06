@@ -2,7 +2,8 @@
 #define ENCRYPTION_HPP
 
 #include <string>
-using namespace std;
-int executeEncryption(const string &taskData);
+
+// This function declaration is now required.
+void executeEncryption(const char* taskStr);
 
 #endif
